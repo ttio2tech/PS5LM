@@ -1,0 +1,63 @@
+/* What every game page shares: the bar, pause, banners, touch buttons.
+   SPDX-License-Identifier: GPL-3.0-or-later */
+:root {
+  --bg: #05070d; --panel: #0d1220; --raised: #151c30; --line: #232c45;
+  --text: #f5f7ff; --muted: #9aa3bd; --accent: #3d7bff; --good: #3ddc97; --bad: #ff5d6c;
+}
+html { font-size: 20px; font-size: clamp(15px, 1.15vw, 26px); }
+html, body { margin: 0; height: 100%; background: var(--bg); color: var(--text); overflow: hidden;
+  font-family: "SST", "SST Roman", "SST-Roman", -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  -webkit-user-select: none; user-select: none; -webkit-tap-highlight-color: transparent; }
+body { display: flex; flex-direction: column; background: radial-gradient(ellipse at top, #121a33 0%, var(--bg) 70%); }
+button { font: inherit; color: inherit; cursor: pointer; }
+button:focus { outline: 3px solid var(--text); outline-offset: 3px; }
+
+.kit-bar { display: flex; align-items: center; gap: 1rem; padding: 0.6rem 1.2rem; flex: none;
+  border-bottom: 1px solid var(--line); background: rgba(5, 7, 13, 0.7); }
+.kit-back, .kit-help { background: var(--raised); border: 1px solid var(--line); border-radius: 999px;
+  padding: 0.35rem 1rem; font-size: 0.85rem; }
+.kit-title { font-weight: 600; font-size: 1.1rem; flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.kit-score { display: flex; gap: 1.2rem; color: var(--muted); font-size: 0.9rem; }
+.kit-score b { color: var(--text); font-size: 1.1rem; margin-left: 0.3rem; }
+
+.kit-stage { flex: 1; display: flex; align-items: center; justify-content: center; padding: 16px; min-height: 0; }
+.kit-stage canvas { display: block; border-radius: 12px; background: #0a0f1c; box-shadow: 0 0 0 1px var(--line), 0 20px 60px rgba(0, 0, 0, 0.5); }
+
+.kit-pause, .kit-banner { position: fixed; left: 0; top: 0; right: 0; bottom: 0; display: none;
+  align-items: center; justify-content: center; background: rgba(3, 5, 10, 0.72); z-index: 20; }
+.kit-pause.kit-shown, .kit-banner.kit-shown { display: flex; }
+.kit-banner { background: rgba(3, 5, 10, 0.55); flex-direction: column; text-align: center; pointer-events: none; z-index: 10; }
+.kit-banner h2 { font-size: 2.6rem; margin: 0 0 0.4rem; letter-spacing: 0.02em; }
+.kit-banner p { color: var(--muted); margin: 0 0 1.2rem; font-size: 1.1rem; padding: 0 16px; }
+.kit-hint { display: inline-block; padding: 0.4rem 1.2rem; border-radius: 999px; background: var(--text); color: #000; font-weight: 600; }
+.kit-pause-box { background: var(--panel); border: 1px solid var(--line); border-radius: 18px; padding: 1.6rem 2rem; min-width: 18rem; max-width: 90vw; }
+.kit-pause-box h2 { margin: 0 0 1rem; }
+.kit-controls { list-style: none; margin: 0 0 1.4rem; padding: 0; }
+.kit-controls li { display: flex; gap: 1rem; padding: 0.35rem 0; border-bottom: 1px solid var(--line); font-size: 0.9rem; }
+.kit-controls b { min-width: 8rem; }
+.kit-controls span { color: var(--muted); }
+.kit-pause-row { display: flex; gap: 0.8rem; }
+.kit-btn { background: var(--raised); border: 1px solid var(--line); border-radius: 10px; padding: 0.6rem 1.2rem; }
+.kit-primary { background: var(--text); color: #000; border-color: var(--text); font-weight: 600; }
+
+.kit-touch { display: flex; justify-content: space-between; align-items: center; padding: 8px 20px 16px; flex: none; }
+.kit-dirs { position: relative; width: 150px; height: 150px; }
+.kit-dirs button, .kit-act { position: absolute; width: 52px; height: 52px; border-radius: 50%;
+  background: var(--raised); border: 1px solid var(--line); font-size: 18px; touch-action: none; }
+.kit-up { left: 49px; top: 0; } .kit-down { left: 49px; bottom: 0; }
+.kit-left { left: 0; top: 49px; } .kit-right { right: 0; top: 49px; }
+.kit-acts { display: flex; gap: 14px; }
+.kit-act { position: static; width: 64px; height: 64px; font-size: 22px; }
+
+@media (max-width: 640px) {
+  .kit-touch { padding: 6px 16px 14px; }
+  .kit-dirs { width: 132px; height: 132px; }
+  .kit-dirs button { width: 44px; height: 44px; font-size: 15px; }
+  .kit-up, .kit-down { left: 44px; } .kit-left, .kit-right { top: 44px; }
+  .kit-acts { gap: 8px; }
+  .kit-act { width: 52px; height: 52px; font-size: 19px; }
+  .kit-score { gap: 0.6rem; font-size: 0.8rem; }
+  .kit-help { display: none; }
+  .kit-banner h2 { font-size: 2rem; }
+  .kit-bar { padding: 0.5rem 16px; gap: 0.6rem; }
+}

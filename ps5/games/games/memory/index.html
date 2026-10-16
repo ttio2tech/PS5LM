@@ -1,0 +1,149 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+<title>Memory Match</title>
+<!-- SPDX-License-Identifier: GPL-3.0-or-later -->
+<link rel="stylesheet" href="../../lib/kit.css">
+<style>
+  .grid { display: grid; grid-template-columns: repeat(6, 1fr); gap: 14px; }
+  .card { position: relative; border-radius: 14px; cursor: pointer; -webkit-perspective: 600px; perspective: 600px; }
+  .face, .back { position: absolute; left: 0; top: 0; right: 0; bottom: 0; border-radius: 14px; display: flex; align-items: center; justify-content: center;
+    -webkit-backface-visibility: hidden; backface-visibility: hidden; -webkit-transition: -webkit-transform 0.3s; transition: transform 0.3s; }
+  .back { background: linear-gradient(135deg, #ef476f, #ffd166); }
+  .back:after { content: "?"; font-size: 0.6em; font-weight: 800; color: rgba(255, 255, 255, 0.7); }
+  .face { background: #f5f7ff; -webkit-transform: rotateY(180deg); transform: rotateY(180deg); }
+  .card.up .back { -webkit-transform: rotateY(180deg); transform: rotateY(180deg); }
+  .card.up .face { -webkit-transform: rotateY(0deg); transform: rotateY(0deg); }
+  .card.done .face { background: #3ddc97; }
+  .card.cur { outline: 3px solid #f5f7ff; outline-offset: 4px; }
+  .turns { text-align: center; color: #9aa3bd; margin-bottom: 12px; }
+  .turns b { color: #f5f7ff; }
+</style>
+</head>
+<body>
+<div class="kit-stage"><div><div class="turns">Turns <b id="turns">0</b> · Pairs <b id="pairs">0</b>/12</div><div class="grid" id="grid"></div></div></div>
+<script src="../../lib/kit.js"></script>
+<script>
+(function () {
+  'use strict';
+  var COLS = 6, ROWS = 4;
+  // Shapes drawn as text, so there is nothing to load.
+  var SYMBOLS = ['★', '♥', '♫', '☀', '☾', '☂', '☘', '♞', '✈', '❄', '⚓', '☯'];
+  var TINTS = ['#ef476f', '#e63946', '#3d7bff', '#ff9f43', '#7b3dff', '#00a3ff', '#2a9d8f', '#1b1b1b', '#0077b6', '#38b6ff', '#264653', '#b15cff'];
+  var grid = document.getElementById('grid');
+  var cards, cur, first, second, turns, pairs, lock, state;
+
+  Kit.init({
+    id: 'memory', name: 'Memory Match',
+    controls: [['D-pad', 'Move'], ['Cross', 'Turn a card'], ['Square', 'New game'], ['Options', 'Pause']]
+  });
+
+  function layout() {
+    var bar = document.querySelector('.kit-bar');
+    var s = Math.floor(Math.min((window.innerWidth - 48 - 14 * (COLS - 1)) / COLS,
+      (window.innerHeight - bar.offsetHeight - 110 - 14 * (ROWS - 1)) / ROWS, 150));
+    grid.style.gridTemplateColumns = 'repeat(' + COLS + ', ' + s + 'px)';
+    grid.style.gridAutoRows = s + 'px';
+    grid.style.fontSize = Math.floor(s * 0.55) + 'px';
+  }
+  window.addEventListener('resize', layout);
+
+  function begin() {
+    var ids = [];
+    for (var i = 0; i < SYMBOLS.length; i++) { ids.push(i, i); }
+    for (var j = ids.length - 1; j > 0; j--) {
+      var k = Math.floor(Math.random() * (j + 1));
+      var t = ids[j]; ids[j] = ids[k]; ids[k] = t;
+    }
+    cards = ids.map(function (id) { return { id: id, up: false, done: false }; });
+    cur = 0; first = -1; second = -1; turns = 0; pairs = 0; lock = false; state = 'playing';
+    Kit.setScore(0);
+    Kit.banner(null);
+    build();
+    draw();
+  }
+
+  function build() {
+    grid.innerHTML = '';
+    for (var i = 0; i < cards.length; i++) {
+      var c = document.createElement('div');
+      c.className = 'card';
+      var back = document.createElement('div');
+      back.className = 'back';
+      var face = document.createElement('div');
+      face.className = 'face';
+      face.textContent = SYMBOLS[cards[i].id];
+      face.style.color = TINTS[cards[i].id];
+      c.appendChild(back);
+      c.appendChild(face);
+      c.onclick = (function (n) { return function () { if (state === 'playing') { cur = n; flip(n); } }; })(i);
+      grid.appendChild(c);
+    }
+  }
+
+  function draw() {
+    for (var i = 0; i < cards.length; i++) {
+      var c = cards[i];
+      grid.children[i].className = 'card' + (c.up || c.done ? ' up' : '') + (c.done ? ' done' : '') + (i === cur && state === 'playing' ? ' cur' : '');
+    }
+    document.getElementById('turns').textContent = turns;
+    document.getElementById('pairs').textContent = pairs;
+  }
+
+  function flip(i) {
+    var c = cards[i];
+    if (lock || c.up || c.done) { return; }
+    c.up = true;
+    if (first < 0) {
+      first = i;
+    } else {
+      second = i;
+      turns++;
+      lock = true;
+      var a = cards[first], b = cards[second];
+      if (a.id === b.id) {
+        a.done = b.done = true;
+        pairs++;
+        reset();
+        if (pairs === SYMBOLS.length) { win(); }
+      } else {
+        window.setTimeout(function () { a.up = b.up = false; reset(); draw(); }, 800);
+      }
+    }
+    draw();
+  }
+
+  function reset() { first = -1; second = -1; lock = false; }
+
+  function win() {
+    state = 'won';
+    var score = Math.max(100, 1000 - (turns - SYMBOLS.length) * 25);
+    Kit.setScore(score);
+    var best = Kit.submit(score);
+    window.setTimeout(function () {
+      Kit.banner('All pairs found!', turns + ' turns · ' + score + ' points' + (best ? ' · new best!' : ''), '✕  Play again');
+    }, 400);
+  }
+
+  Kit.on(function (action) {
+    if (state !== 'playing') {
+      if (action === 'a') { begin(); }
+      return;
+    }
+    if (action === 'left') { cur = (cur + cards.length - 1) % cards.length; }
+    if (action === 'right') { cur = (cur + 1) % cards.length; }
+    if (action === 'up') { cur = (cur - COLS + cards.length) % cards.length; }
+    if (action === 'down') { cur = (cur + COLS) % cards.length; }
+    if (action === 'a') { flip(cur); return; }
+    if (action === 'x') { begin(); return; }
+    draw();
+  });
+
+  layout();
+  begin();
+})();
+</script>
+</body>
+</html>

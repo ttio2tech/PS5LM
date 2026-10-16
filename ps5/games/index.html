@@ -1,0 +1,63 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PS5LM Arcade</title>
+<!--
+  The game store the PS5LM app serves on port 8083 (ps5/app/games_server.cpp):
+  browse the games in games.json, read about one, play it. Driven by the
+  DualSense, a keyboard, a mouse or touch. Plain ES5 with no external files,
+  because the PS5 browser renders modern bundles blank.
+  SPDX-License-Identifier: GPL-3.0-or-later
+-->
+<link rel="stylesheet" href="store.css">
+</head>
+<body>
+<header class="top">
+  <div class="brand"><span class="logo"></span>PS5LM <b>Arcade</b></div>
+  <nav class="tabs" id="tabs"></nav>
+  <div class="ai" id="ai" title="The language model on your PS5"><i></i><span>Checking the model…</span></div>
+</header>
+
+<main class="scroll" id="scroll">
+  <section class="hero" id="hero"></section>
+  <section class="shelf" id="recent-shelf">
+    <h2>Continue playing</h2>
+    <div class="row" id="recent"></div>
+  </section>
+  <section class="shelf">
+    <h2 id="grid-title">All games</h2>
+    <div class="grid" id="grid"></div>
+  </section>
+  <footer class="foot">
+    <span><b>L1</b> <b>R1</b> categories</span>
+    <span><b>✕</b> open</span>
+    <span><b>○</b> back</span>
+    <span class="dim">Games run in this browser; AI games use the model loaded on the PS5.</span>
+  </footer>
+</main>
+
+<div class="detail" id="detail">
+  <div class="sheet">
+    <div class="art" id="d-art"><img id="d-icon" alt=""></div>
+    <div class="info">
+      <div class="kicker" id="d-cat"></div>
+      <h1 id="d-name"></h1>
+      <p class="tag" id="d-tag"></p>
+      <p id="d-desc"></p>
+      <div class="stats" id="d-stats"></div>
+      <ul class="controls" id="d-controls"></ul>
+      <div class="actions">
+        <button class="play" id="d-play" data-nav>Play</button>
+        <button class="ghost" id="d-close" data-nav>Back</button>
+      </div>
+      <p class="warn" id="d-warn"></p>
+    </div>
+  </div>
+</div>
+
+<script src="lib/kit.js"></script>
+<script src="store.js"></script>
+</body>
+</html>

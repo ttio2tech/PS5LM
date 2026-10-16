@@ -39,6 +39,7 @@
 
 #include "dashboard.hpp"
 #include "fetch.hpp"
+#include "games_server.hpp"
 #include "market.hpp"
 #include "display.hpp"
 #include "ggml-backend.h"
@@ -109,6 +110,8 @@ constexpr const char * kLlamaLog    = "/data/PS5LM/llama.log";
 constexpr const char * kModels      = "/data/PS5LM/models";
 constexpr const char * kAssets      = "/app0/assets";
 constexpr int          kPort        = 8081;
+constexpr int          kGamesPort   = 8083;   // the game store (games_server.hpp)
+constexpr const char * kGames       = "/app0/games";
 const std::vector<std::string> kModelDirs = { kModels, "/mnt/ext0/PS5LM/models", "/mnt/usb0/PS5LM/models",
                                               "/mnt/usb1/PS5LM/models", "/mnt/usb0", "/mnt/usb1" };
 
@@ -596,6 +599,7 @@ int main(int, char **) {
 
     StatsCollector stats;
     stats.start(kPort);
+    start_games_server(kGames, kGamesPort, kPort);
     models.settings = load_settings(kSettings);
     models.scan(stats);
 
@@ -690,7 +694,7 @@ int main(int, char **) {
         }
         const bool serving = live.state == ServerState::ready || live.state == ServerState::generating;
         if (serving && !was_serving) {
-            notify("PS5LM Plus: ready, chat in a browser on this network");
+            notify("PS5LM Plus: ready, chat on port 8081 and games on 8083, in a browser on this network");
         }
         was_serving = serving;
         if (n % 30 == 0) {

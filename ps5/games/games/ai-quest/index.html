@@ -1,0 +1,180 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>AI Quest</title>
+<!-- SPDX-License-Identifier: GPL-3.0-or-later -->
+<link rel="stylesheet" href="../../lib/kit.css">
+<link rel="stylesheet" href="../../lib/ai.css">
+</head>
+<body>
+<div class="ai-page" id="page"><div class="ai-col">
+  <div class="ai-status" id="status"></div>
+  <div id="story"></div>
+  <div id="box"></div>
+</div></div>
+<script src="../../lib/kit.js"></script>
+<script src="../../lib/choices.js"></script>
+<script>
+(function () {
+  'use strict';
+  var WORLDS = [
+    { name: 'The Sunken Crown', kind: 'high fantasy', start: 'a rain-soaked village at the edge of a cursed forest, where the old king’s crown was lost' },
+    { name: 'Derelict Signal', kind: 'science fiction', start: 'a silent, drifting space station that just sent its first distress call in forty years' },
+    { name: 'Hollow Manor', kind: 'gothic mystery', start: 'the gates of a manor whose owner vanished the night of a storm, leaving a letter addressed to you' },
+    { name: 'Salt and Gold', kind: 'pirate adventure', start: 'a harbour tavern where a dying sailor presses half a treasure map into your hand' }
+  ];
+  var MAX_TURNS = 12;
+  var story = document.getElementById('story');
+  var box = document.getElementById('box');
+  var world, hp, gold, items, turn, history;
+
+  Kit.init({
+    id: 'ai-quest', name: 'AI Quest',
+    controls: [['D-pad', 'Pick a choice'], ['Cross', 'Choose'], ['Options', 'Pause']],
+    touch: false
+  });
+
+  function el(tag, cls, text) {
+    var e = document.createElement(tag);
+    if (cls) { e.className = cls; }
+    if (text !== undefined) { e.textContent = text; }
+    return e;
+  }
+
+  function status() {
+    var s = document.getElementById('status');
+    if (!world) { s.innerHTML = ''; return; }
+    s.innerHTML = '';
+    var parts = [['♥', hp + '/10'], ['Gold', gold], ['Turn', turn + '/' + MAX_TURNS], ['Items', items.length ? items.join(', ') : 'none']];
+    for (var i = 0; i < parts.length; i++) {
+      var sp = el('span', '', parts[i][0] + ' ');
+      sp.appendChild(el('b', '', String(parts[i][1])));
+      s.appendChild(sp);
+    }
+    Kit.setScore(score());
+  }
+
+  function score() { return turn * 10 + gold + (hp > 0 ? hp * 5 : 0); }
+
+  function menu() {
+    world = null;
+    status();
+    story.innerHTML = '';
+    story.appendChild(el('h1', '', 'AI Quest'));
+    story.appendChild(el('p', 'lead', 'Choose a world. The model on your PS5 tells the story; you decide what happens next.'));
+    Kit.aiReady(function (up) {
+      if (!up) { story.appendChild(el('p', 'ai-error', 'No model is loaded on the PS5 yet. Load one from the PS5LM app’s library, then come back.')); }
+    });
+    Choices.show(box, WORLDS.map(function (w) { return w.name + ' — ' + w.kind; }), function (n) { begin(WORLDS[n]); });
+  }
+
+  function system() {
+    return 'You are the narrator of a short interactive ' + world.kind + ' adventure called "' + world.name + '". ' +
+      'Write in second person, vivid but brief: 2 to 4 sentences per scene. Keep it suitable for teenagers. ' +
+      'The player has ' + hp + ' of 10 health, ' + gold + ' gold, and these items: ' + (items.length ? items.join(', ') : 'none') + '. ' +
+      'This is turn ' + turn + ' of ' + MAX_TURNS + '. ' +
+      (turn >= MAX_TURNS ? 'This is the final scene: bring the story to a satisfying ending and set "ending" to true. ' : '') +
+      'Choices can be risky: dangerous ones may cost health (health_change from -3 to 0), clever ones may find gold (gold_change from 0 to 15) or an item. ' +
+      'Reply with JSON only, no other text, in exactly this form: ' +
+      '{"scene": "what happens", "choices": ["first option", "second option", "third option"], ' +
+      '"health_change": 0, "gold_change": 0, "new_item": "", "ending": false}';
+  }
+
+  function begin(w) {
+    world = w;
+    hp = 10; gold = 0; items = []; turn = 0;
+    history = [{ role: 'user', content: 'Begin the adventure at ' + w.start + '.' }];
+    story.innerHTML = '';
+    step();
+  }
+
+  function thinking(on) {
+    var t = document.getElementById('thinking');
+    if (on && !t) {
+      t = el('div', 'thinking');
+      t.id = 'thinking';
+      t.appendChild(el('i')); t.appendChild(el('i')); t.appendChild(el('i'));
+      t.appendChild(el('span', '', 'The story unfolds…'));
+      box.innerHTML = '';
+      box.appendChild(t);
+    } else if (!on && t) {
+      t.parentNode.removeChild(t);
+    }
+  }
+
+  // One scene: ask, read the JSON, show it with its choices.
+  function step(retry) {
+    turn++;
+    status();
+    thinking(true);
+    // The last few exchanges only, so a small context holds the game.
+    var msgs = [{ role: 'system', content: system() }].concat(history.slice(-7));
+    Kit.ai(msgs, { max_tokens: 450, temperature: 0.9 }, function (err, text) {
+      thinking(false);
+      if (err) { turn--; failed(err); return; }
+      var r = Kit.json(text);
+      if (!r || typeof r.scene !== 'string' || !r.choices || r.choices.length < 2) {
+        if (!retry) { turn--; step(true); return; }
+        // Not JSON twice: tell it as plain text and carry on.
+        r = { scene: text.slice(0, 900), choices: ['Press on', 'Look around carefully', 'Turn back'] };
+      }
+      history.push({ role: 'assistant', content: JSON.stringify(r) });
+      show(r);
+    });
+  }
+
+  function clamp(v, lo, hi) { v = parseInt(v, 10); return isNaN(v) ? 0 : Math.max(lo, Math.min(hi, v)); }
+
+  function show(r) {
+    var dh = clamp(r.health_change, -4, 3), dg = clamp(r.gold_change, -20, 30);
+    hp = Math.min(10, hp + dh);
+    gold = Math.max(0, gold + dg);
+    var item = typeof r.new_item === 'string' ? r.new_item.trim() : '';
+    if (item && item.length < 40 && items.indexOf(item) < 0) { items.push(item); } else { item = ''; }
+    story.innerHTML = '';
+    story.appendChild(el('h1', '', world.name));
+    var ev = el('div');
+    if (dh < 0) { ev.appendChild(el('span', 'ai-event bad', dh + ' health')); }
+    if (dh > 0) { ev.appendChild(el('span', 'ai-event good', '+' + dh + ' health')); }
+    if (dg > 0) { ev.appendChild(el('span', 'ai-event good', '+' + dg + ' gold')); }
+    if (item) { ev.appendChild(el('span', 'ai-event good', 'Found: ' + item)); }
+    story.appendChild(ev);
+    story.appendChild(el('p', 'ai-text', r.scene));
+    status();
+    if (hp <= 0) { end('Your journey ends here.'); return; }
+    if (r.ending || turn >= MAX_TURNS) { end('The end.'); return; }
+    var opts = [];
+    for (var i = 0; i < r.choices.length && opts.length < 4; i++) {
+      if (typeof r.choices[i] === 'string' && r.choices[i].trim()) { opts.push(r.choices[i].trim()); }
+    }
+    Choices.show(box, opts, function (n) {
+      history.push({ role: 'user', content: 'I choose: ' + opts[n] });
+      step();
+    });
+  }
+
+  function end(line) {
+    var s = score();
+    var best = Kit.submit(s);
+    box.innerHTML = '';
+    box.appendChild(el('p', 'lead', line + ' Score ' + s + (best ? ' · new best!' : '') + '.'));
+    Choices.show(box, ['Play again in ' + world.name, 'Choose another world'], function (n) {
+      if (n === 0) { begin(world); } else { menu(); }
+    });
+  }
+
+  function failed(err) {
+    box.innerHTML = '';
+    box.appendChild(el('p', 'ai-error', err));
+    Choices.show(box, ['Try again', 'Back to the worlds'], function (n) {
+      if (n === 0) { step(); } else { menu(); }
+    });
+  }
+
+  menu();
+})();
+</script>
+</body>
+</html>

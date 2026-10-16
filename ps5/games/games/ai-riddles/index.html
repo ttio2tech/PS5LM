@@ -1,0 +1,185 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Riddle Master</title>
+<!-- SPDX-License-Identifier: GPL-3.0-or-later -->
+<link rel="stylesheet" href="../../lib/kit.css">
+<link rel="stylesheet" href="../../lib/ai.css">
+</head>
+<body>
+<div class="ai-page"><div class="ai-col">
+  <div class="ai-status" id="status"></div>
+  <div id="story"></div>
+  <div id="box"></div>
+</div></div>
+<script src="../../lib/kit.js"></script>
+<script src="../../lib/choices.js"></script>
+<script>
+(function () {
+  'use strict';
+  var LEVELS = [
+    { name: 'Easy', hint: 'a simple riddle a ten-year-old could solve' },
+    { name: 'Tricky', hint: 'a classic-style riddle that takes some lateral thinking' },
+    { name: 'Fiendish', hint: 'a hard riddle with wordplay or a misleading clue' }
+  ];
+  var ROUNDS = 10;
+  var story = document.getElementById('story');
+  var box = document.getElementById('box');
+  var level, round, score, streak, seen, nextRiddle, waiting;
+
+  Kit.init({
+    id: 'ai-riddles', name: 'Riddle Master',
+    controls: [['D-pad', 'Pick an answer'], ['Cross', 'Answer'], ['Options', 'Pause']],
+    touch: false
+  });
+
+  function el(tag, cls, text) {
+    var e = document.createElement(tag);
+    if (cls) { e.className = cls; }
+    if (text !== undefined) { e.textContent = text; }
+    return e;
+  }
+
+  function status() {
+    var s = document.getElementById('status');
+    s.innerHTML = '';
+    if (level === undefined) { return; }
+    var parts = [['Riddle', Math.min(round, ROUNDS) + '/' + ROUNDS], ['Streak', streak], ['Level', LEVELS[level].name]];
+    for (var i = 0; i < parts.length; i++) {
+      var sp = el('span', '', parts[i][0] + ' ');
+      sp.appendChild(el('b', '', String(parts[i][1])));
+      s.appendChild(sp);
+    }
+    Kit.setScore(score);
+  }
+
+  function menu() {
+    level = undefined;
+    status();
+    story.innerHTML = '';
+    story.appendChild(el('h1', '', 'Riddle Master'));
+    story.appendChild(el('p', 'lead', 'Ten riddles written fresh by the model on your PS5. Answer in a row to build a streak bonus.'));
+    Kit.aiReady(function (up) {
+      if (!up) { story.appendChild(el('p', 'ai-error', 'No model is loaded on the PS5 yet. Load one from the PS5LM app’s library, then come back.')); }
+    });
+    Choices.show(box, LEVELS.map(function (l) { return l.name; }), function (n) { begin(n); });
+  }
+
+  function begin(n) {
+    level = n; round = 0; score = 0; streak = 0; seen = []; nextRiddle = null; waiting = null;
+    ask();
+  }
+
+  // Fetches one riddle; cb(err, riddle). The answers come back shuffled,
+  // since models like to put the right one first.
+  function fetch(cb, tries) {
+    tries = tries || 0;
+    var msgs = [
+      { role: 'system', content: 'You write riddles for a quiz game. Reply with JSON only, no other text.' },
+      { role: 'user', content: 'Write ' + LEVELS[level].hint + '. ' +
+        (seen.length ? 'Its answer must not be any of: ' + seen.join(', ') + '. ' : '') +
+        'Give the correct answer and three wrong but plausible answers, each one to three words. Form: ' +
+        '{"riddle": "the riddle", "answer": "correct answer", "wrong": ["wrong 1", "wrong 2", "wrong 3"], "explain": "one short sentence why"}' }
+    ];
+    Kit.ai(msgs, { max_tokens: 300, temperature: 1.0 }, function (err, text) {
+      if (err) { cb(err, null); return; }
+      var r = Kit.json(text);
+      var ok = r && typeof r.riddle === 'string' && typeof r.answer === 'string' && r.wrong && r.wrong.length >= 3;
+      if (!ok) {
+        if (tries < 2) { fetch(cb, tries + 1); return; }
+        cb('The model did not write a riddle the game could read', null);
+        return;
+      }
+      var opts = [r.answer].concat(r.wrong.slice(0, 3)).map(function (s) { return String(s).trim(); });
+      for (var i = opts.length - 1; i > 0; i--) {
+        var j = Math.floor(Math.random() * (i + 1));
+        var t = opts[i]; opts[i] = opts[j]; opts[j] = t;
+      }
+      cb(null, { riddle: r.riddle, options: opts, right: opts.indexOf(String(r.answer).trim()), explain: r.explain || '' });
+    });
+  }
+
+  // The next riddle is asked for while this one is answered.
+  function prefetch() {
+    nextRiddle = { pending: true };
+    var slot = nextRiddle;
+    fetch(function (err, r) {
+      slot.pending = false;
+      slot.err = err;
+      slot.r = r;
+      if (waiting === slot) { waiting = null; use(slot); }
+    });
+  }
+
+  function ask() {
+    round++;
+    status();
+    story.innerHTML = '';
+    box.innerHTML = '';
+    var t = el('div', 'thinking');
+    t.appendChild(el('i')); t.appendChild(el('i')); t.appendChild(el('i'));
+    t.appendChild(el('span', '', 'Thinking of a riddle…'));
+    box.appendChild(t);
+    if (!nextRiddle) { prefetch(); }
+    var slot = nextRiddle;
+    nextRiddle = null;
+    if (slot.pending) { waiting = slot; } else { use(slot); }
+  }
+
+  function use(slot) {
+    if (slot.err) { failed(slot.err); return; }
+    var r = slot.r;
+    seen.push(r.options[r.right]);
+    if (round < ROUNDS) { prefetch(); }
+    story.innerHTML = '';
+    story.appendChild(el('h1', '', 'Riddle ' + round));
+    story.appendChild(el('p', 'ai-text', r.riddle));
+    var buttons = Choices.show(box, r.options, function (n) {
+      var right = n === r.right;
+      buttons[r.right].className += ' right';
+      if (!right) { buttons[n].className += ' wrong'; }
+      if (right) {
+        streak++;
+        score += 100 + (streak - 1) * 25 + level * 50;
+      } else {
+        streak = 0;
+      }
+      status();
+      var after = el('p', 'lead', (right ? 'Correct! ' : 'Not quite. ') + r.explain);
+      box.appendChild(after);
+      var next = el('div');
+      box.appendChild(next);
+      Choices.show(next, [round < ROUNDS ? 'Next riddle' : 'See the score'], function () {
+        if (round < ROUNDS) { ask(); } else { end(); }
+      });
+    });
+  }
+
+  function end() {
+    var best = Kit.submit(score);
+    story.innerHTML = '';
+    story.appendChild(el('h1', '', 'Final score: ' + score));
+    story.appendChild(el('p', 'lead', LEVELS[level].name + (best ? ' · new best!' : '')));
+    Choices.show(box, ['Play again', 'Change level'], function (n) {
+      if (n === 0) { begin(level); } else { menu(); }
+    });
+  }
+
+  function failed(err) {
+    round--;
+    box.innerHTML = '';
+    box.appendChild(el('p', 'ai-error', err));
+    var b = el('div');
+    box.appendChild(b);
+    Choices.show(b, ['Try again', 'Back to the levels'], function (n) {
+      if (n === 0) { ask(); } else { menu(); }
+    });
+  }
+
+  menu();
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,254 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+<title>Minesweeper</title>
+<!-- SPDX-License-Identifier: GPL-3.0-or-later -->
+<link rel="stylesheet" href="../../lib/kit.css">
+<style>
+  .wrap { display: flex; flex-direction: column; align-items: center; gap: 12px; }
+  .info { display: flex; gap: 24px; color: #9aa3bd; font-size: 0.9rem; }
+  .info b { color: #f5f7ff; }
+  .levels { display: flex; gap: 8px; }
+  .levels button { background: #151c30; border: 1px solid #232c45; border-radius: 999px; padding: 4px 14px; font-size: 0.85rem; color: #9aa3bd; }
+  .levels button.on { background: #f5f7ff; color: #000; }
+  .field { display: grid; gap: 3px; background: #0a0f1c; padding: 8px; border-radius: 12px; }
+  .sq { display: flex; align-items: center; justify-content: center; border-radius: 5px; font-weight: 800;
+    background: #2a3658; box-shadow: inset 0 -3px 0 rgba(0, 0, 0, 0.25); cursor: pointer; }
+  .sq.open { background: #121a2e; box-shadow: none; cursor: default; }
+  .sq.cur { outline: 3px solid #f5f7ff; outline-offset: 1px; position: relative; z-index: 1; }
+  .sq.boom { background: #ff5d6c; }
+  .n1 { color: #5aa9ff; } .n2 { color: #3ddc97; } .n3 { color: #ff5d6c; } .n4 { color: #b15cff; }
+  .n5 { color: #ff9f43; } .n6 { color: #38d9f5; } .n7 { color: #f5f7ff; } .n8 { color: #9aa3bd; }
+</style>
+</head>
+<body>
+<div class="kit-stage">
+  <div class="wrap">
+    <div class="levels" id="levels"></div>
+    <div class="info"><span>Mines left <b id="left">0</b></span><span>Time <b id="time">0</b>s</span></div>
+    <div class="field" id="field"></div>
+  </div>
+</div>
+<script src="../../lib/kit.js"></script>
+<script>
+(function () {
+  'use strict';
+  var LEVELS = [{ name: 'Easy', w: 9, h: 9, m: 10 }, { name: 'Medium', w: 16, h: 12, m: 30 }, { name: 'Hard', w: 22, h: 14, m: 60 }];
+  var level = Kit.store('mines.level') || 0;
+  var field = document.getElementById('field');
+  var cells, W, H, M, cx, cy, state, started, flags, opened, timer;
+
+  Kit.init({
+    id: 'mines', name: 'Minesweeper',
+    controls: [['D-pad', 'Move'], ['Cross', 'Open'], ['Square', 'Flag'], ['L1 / R1', 'Easy, medium, hard'], ['Triangle', 'New game'], ['Options', 'Pause']],
+    touch: [['x', '⚑'], ['a', '✕']]
+  });
+
+  function drawLevels() {
+    var box = document.getElementById('levels');
+    box.innerHTML = '';
+    for (var i = 0; i < LEVELS.length; i++) {
+      var b = document.createElement('button');
+      b.textContent = LEVELS[i].name;
+      b.className = i === level ? 'on' : '';
+      b.onclick = (function (n) { return function () { setLevel(n); }; })(i);
+      box.appendChild(b);
+    }
+  }
+
+  function setLevel(n) {
+    level = (n + LEVELS.length) % LEVELS.length;
+    Kit.store('mines.level', level);
+    begin();
+  }
+
+  function begin() {
+    var L = LEVELS[level];
+    W = L.w; H = L.h; M = L.m;
+    cells = [];
+    for (var i = 0; i < W * H; i++) { cells.push({ mine: false, open: false, flag: false, n: 0 }); }
+    cx = Math.floor(W / 2); cy = Math.floor(H / 2);
+    state = 'playing'; started = 0; flags = 0; opened = 0;
+    window.clearInterval(timer);
+    document.getElementById('time').textContent = '0';
+    Kit.setScore(0);
+    Kit.banner(null);
+    drawLevels();
+    layout();
+    draw();
+  }
+
+  // Mines go down on the first open, never on or next to that square.
+  function plant(sx, sy) {
+    var placed = 0;
+    while (placed < M) {
+      var x = Math.floor(Math.random() * W), y = Math.floor(Math.random() * H);
+      if (Math.abs(x - sx) <= 1 && Math.abs(y - sy) <= 1) { continue; }
+      var c = cells[y * W + x];
+      if (c.mine) { continue; }
+      c.mine = true;
+      placed++;
+    }
+    for (var yy = 0; yy < H; yy++) {
+      for (var xx = 0; xx < W; xx++) {
+        var n = 0;
+        around(xx, yy, function (a) { if (a.mine) { n++; } });
+        cells[yy * W + xx].n = n;
+      }
+    }
+  }
+
+  function around(x, y, fn) {
+    for (var dy = -1; dy <= 1; dy++) {
+      for (var dx = -1; dx <= 1; dx++) {
+        var nx = x + dx, ny = y + dy;
+        if ((dx || dy) && nx >= 0 && ny >= 0 && nx < W && ny < H) { fn(cells[ny * W + nx], nx, ny); }
+      }
+    }
+  }
+
+  function open(x, y) {
+    var c = cells[y * W + x];
+    if (c.flag) { return; }
+    if (!started) {
+      plant(x, y);
+      started = Date.now();
+      timer = window.setInterval(function () {
+        if (!Kit.paused()) { document.getElementById('time').textContent = Math.floor((Date.now() - started) / 1000); }
+      }, 500);
+    }
+    if (c.open) {
+      // Chord: an open number with its flags all down opens the rest round it.
+      var f = 0;
+      around(x, y, function (a) { if (a.flag) { f++; } });
+      if (f === c.n) { around(x, y, function (a, ax, ay) { if (!a.open && !a.flag) { reveal(ax, ay); } }); }
+    } else {
+      reveal(x, y);
+    }
+    check();
+  }
+
+  function reveal(x, y) {
+    var stack = [[x, y]];
+    while (stack.length) {
+      var p = stack.pop(), c = cells[p[1] * W + p[0]];
+      if (c.open || c.flag) { continue; }
+      c.open = true;
+      if (c.mine) { c.boom = true; state = 'lost'; return; }
+      opened++;
+      if (!c.n) { around(p[0], p[1], function (a, ax, ay) { if (!a.open) { stack.push([ax, ay]); } }); }
+    }
+  }
+
+  function check() {
+    if (state === 'lost') {
+      window.clearInterval(timer);
+      for (var i = 0; i < cells.length; i++) { if (cells[i].mine) { cells[i].open = true; } }
+      draw();
+      Kit.banner('Boom', 'You hit a mine.', '✕  Try again');
+      return;
+    }
+    if (opened === W * H - M) {
+      state = 'won';
+      window.clearInterval(timer);
+      var secs = Math.max(1, Math.floor((Date.now() - started) / 1000));
+      // Score: harder fields and faster clears are worth more.
+      var score = Math.max(10, Math.round((level + 1) * 1000 - secs * (3 - level)));
+      Kit.setScore(score);
+      var best = Kit.submit(score);
+      draw();
+      Kit.banner('Cleared!', LEVELS[level].name + ' in ' + secs + ' s · ' + score + ' points' + (best ? ' · new best!' : ''), '✕  Play again');
+      return;
+    }
+    draw();
+  }
+
+  function flag(x, y) {
+    var c = cells[y * W + x];
+    if (c.open) { return; }
+    c.flag = !c.flag;
+    flags += c.flag ? 1 : -1;
+    draw();
+  }
+
+  function layout() {
+    var bar = document.querySelector('.kit-bar'), touch = document.querySelector('.kit-touch');
+    var availW = window.innerWidth - 48, availH = window.innerHeight - bar.offsetHeight - (touch ? touch.offsetHeight : 0) - 140;
+    var s = Math.floor(Math.min(availW / W, availH / H, 56)) - 3;
+    field.style.gridTemplateColumns = 'repeat(' + W + ', ' + s + 'px)';
+    field.style.gridAutoRows = s + 'px';
+    field.style.fontSize = Math.floor(s * 0.55) + 'px';
+  }
+  window.addEventListener('resize', layout);
+
+  function draw() {
+    document.getElementById('left').textContent = M - flags;
+    field.innerHTML = '';
+    for (var y = 0; y < H; y++) {
+      for (var x = 0; x < W; x++) {
+        var c = cells[y * W + x];
+        var d = document.createElement('div');
+        var cls = 'sq';
+        if (c.open) {
+          cls += ' open';
+          if (c.mine) { d.textContent = '✹'; if (c.boom) { cls += ' boom'; } } else if (c.n) { d.textContent = c.n; cls += ' n' + c.n; }
+        } else if (c.flag) {
+          d.textContent = '⚑';
+        }
+        if (x === cx && y === cy && state === 'playing') { cls += ' cur'; }
+        d.className = cls;
+        d.setAttribute('data-x', x);
+        d.setAttribute('data-y', y);
+        field.appendChild(d);
+      }
+    }
+  }
+
+  // Mouse and touch: tap opens, right click or a long press flags.
+  var pressTimer = null, longDone = false;
+  function target(e) {
+    var t = e.target;
+    return t && t.hasAttribute && t.hasAttribute('data-x') ? [+t.getAttribute('data-x'), +t.getAttribute('data-y')] : null;
+  }
+  field.addEventListener('contextmenu', function (e) {
+    e.preventDefault();
+    var p = target(e);
+    if (p && state === 'playing') { cx = p[0]; cy = p[1]; flag(p[0], p[1]); }
+  });
+  field.addEventListener('touchstart', function (e) {
+    var p = target(e);
+    longDone = false;
+    if (!p || state !== 'playing') { return; }
+    pressTimer = window.setTimeout(function () { longDone = true; cx = p[0]; cy = p[1]; flag(p[0], p[1]); }, 450);
+  });
+  field.addEventListener('touchend', function () { window.clearTimeout(pressTimer); });
+  field.addEventListener('click', function (e) {
+    var p = target(e);
+    if (!p || state !== 'playing' || longDone) { longDone = false; return; }
+    cx = p[0]; cy = p[1];
+    open(p[0], p[1]);
+  });
+
+  Kit.on(function (action) {
+    if (action === 'l1') { setLevel(level - 1); return; }
+    if (action === 'r1') { setLevel(level + 1); return; }
+    if (state !== 'playing') {
+      if (action === 'a') { begin(); }
+      return;
+    }
+    if (action === 'left') { cx = (cx - 1 + W) % W; draw(); }
+    if (action === 'right') { cx = (cx + 1) % W; draw(); }
+    if (action === 'up') { cy = (cy - 1 + H) % H; draw(); }
+    if (action === 'down') { cy = (cy + 1) % H; draw(); }
+    if (action === 'a') { open(cx, cy); }
+    if (action === 'x') { flag(cx, cy); }
+    if (action === 'y') { begin(); }
+  });
+
+  begin();
+})();
+</script>
+</body>
+</html>

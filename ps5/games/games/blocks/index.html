@@ -1,0 +1,265 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+<title>Block Drop</title>
+<!-- SPDX-License-Identifier: GPL-3.0-or-later -->
+<link rel="stylesheet" href="../../lib/kit.css">
+</head>
+<body>
+<div class="kit-stage"><canvas id="c" width="640" height="720"></canvas></div>
+<script src="../../lib/kit.js"></script>
+<script>
+(function () {
+  'use strict';
+  var W = 10, H = 20, CELL = 34, OX = 20, OY = 20;
+  var canvas = document.getElementById('c');
+  var ctx = canvas.getContext('2d');
+
+  var SHAPES = {
+    I: [[0, 1], [1, 1], [2, 1], [3, 1]],
+    O: [[1, 0], [2, 0], [1, 1], [2, 1]],
+    T: [[1, 0], [0, 1], [1, 1], [2, 1]],
+    S: [[1, 0], [2, 0], [0, 1], [1, 1]],
+    Z: [[0, 0], [1, 0], [1, 1], [2, 1]],
+    J: [[0, 0], [0, 1], [1, 1], [2, 1]],
+    L: [[2, 0], [0, 1], [1, 1], [2, 1]]
+  };
+  var COLORS = { I: '#38d9f5', O: '#ffd23f', T: '#b15cff', S: '#3ddc97', Z: '#ff5d6c', J: '#3d7bff', L: '#ff9f43' };
+  var NAMES = 'IOTSZJL';
+
+  var board, piece, next, hold, canHold, bag, score, lines, level, state, dropAt, flash;
+
+  Kit.init({
+    id: 'blocks', name: 'Block Drop',
+    controls: [['Left / Right', 'Move'], ['Up or Triangle', 'Rotate'], ['Circle', 'Rotate back'],
+      ['Down', 'Soft drop'], ['Cross', 'Hard drop'], ['Square', 'Hold'], ['Options', 'Pause']],
+    touch: [['x', 'H'], ['y', '↻'], ['a', '⤓']]
+  });
+  Kit.fit(canvas, canvas.width / canvas.height);
+
+  function newBag() {
+    var b = NAMES.split('');
+    for (var i = b.length - 1; i > 0; i--) {
+      var j = Math.floor(Math.random() * (i + 1));
+      var t = b[i]; b[i] = b[j]; b[j] = t;
+    }
+    return b;
+  }
+
+  function take() {
+    if (!bag.length) { bag = newBag(); }
+    return bag.shift();
+  }
+
+  function spawn(kind) {
+    piece = { kind: kind, cells: SHAPES[kind].map(function (c) { return [c[0], c[1]]; }), x: 3, y: 0 };
+    if (collides(piece.cells, piece.x, piece.y)) { over(); }
+  }
+
+  function collides(cells, x, y) {
+    for (var i = 0; i < cells.length; i++) {
+      var cx = cells[i][0] + x, cy = cells[i][1] + y;
+      if (cx < 0 || cx >= W || cy >= H) { return true; }
+      if (cy >= 0 && board[cy][cx]) { return true; }
+    }
+    return false;
+  }
+
+  function rotate(dirn) {
+    if (piece.kind === 'O') { return; }
+    var size = piece.kind === 'I' ? 4 : 3;
+    var cells = piece.cells.map(function (c) {
+      return dirn > 0 ? [size - 1 - c[1], c[0]] : [c[1], size - 1 - c[0]];
+    });
+    // Wall kicks: try in place, then a step either side, then up.
+    var kicks = [[0, 0], [-1, 0], [1, 0], [-2, 0], [2, 0], [0, -1]];
+    for (var i = 0; i < kicks.length; i++) {
+      if (!collides(cells, piece.x + kicks[i][0], piece.y + kicks[i][1])) {
+        piece.cells = cells;
+        piece.x += kicks[i][0];
+        piece.y += kicks[i][1];
+        return;
+      }
+    }
+  }
+
+  function shift(dx, dy) {
+    if (!collides(piece.cells, piece.x + dx, piece.y + dy)) {
+      piece.x += dx;
+      piece.y += dy;
+      return true;
+    }
+    return false;
+  }
+
+  function lock() {
+    for (var i = 0; i < piece.cells.length; i++) {
+      var cy = piece.cells[i][1] + piece.y;
+      if (cy < 0) { over(); return; }
+      board[cy][piece.cells[i][0] + piece.x] = piece.kind;
+    }
+    var cleared = 0;
+    for (var y = H - 1; y >= 0; y--) {
+      var full = true;
+      for (var x = 0; x < W; x++) { if (!board[y][x]) { full = false; break; } }
+      if (full) {
+        board.splice(y, 1);
+        board.unshift(emptyRow());
+        cleared++;
+        y++;
+      }
+    }
+    if (cleared) {
+      score += [0, 100, 300, 500, 800][cleared] * level;
+      lines += cleared;
+      level = 1 + Math.floor(lines / 10);
+      flash = Date.now();
+      Kit.setScore(score);
+    }
+    canHold = true;
+    spawn(next);
+    next = take();
+  }
+
+  function emptyRow() {
+    var r = [];
+    for (var x = 0; x < W; x++) { r.push(null); }
+    return r;
+  }
+
+  function interval() {
+    return Math.max(70, 800 * Math.pow(0.82, level - 1));
+  }
+
+  function begin() {
+    board = [];
+    for (var y = 0; y < H; y++) { board.push(emptyRow()); }
+    bag = newBag();
+    score = 0; lines = 0; level = 1; hold = null; canHold = true; flash = 0;
+    Kit.setScore(0);
+    state = 'playing';
+    spawn(take());
+    next = take();
+    dropAt = Date.now() + interval();
+    Kit.banner(null);
+  }
+
+  function over() {
+    state = 'over';
+    var best = Kit.submit(score);
+    Kit.banner('Game over', 'Score ' + score + ' · ' + lines + ' lines' + (best ? ' · new best!' : ''), '✕  Play again');
+  }
+
+  Kit.on(function (action) {
+    if (state !== 'playing') {
+      if (action === 'a') { begin(); }
+      return;
+    }
+    if (action === 'left') { shift(-1, 0); }
+    if (action === 'right') { shift(1, 0); }
+    if (action === 'down') {
+      if (shift(0, 1)) { score += 1; Kit.setScore(score); } else { lock(); }
+      dropAt = Date.now() + interval();
+    }
+    if (action === 'up' || action === 'y') { rotate(1); }
+    if (action === 'b') { rotate(-1); }
+    if (action === 'a') {
+      var n = 0;
+      while (shift(0, 1)) { n++; }
+      score += n * 2;
+      Kit.setScore(score);
+      lock();
+      dropAt = Date.now() + interval();
+    }
+    if (action === 'x' && canHold) {
+      var k = piece.kind;
+      if (hold) { spawn(hold); } else { spawn(next); next = take(); }
+      hold = k;
+      canHold = false;
+    }
+  });
+
+  function cell(x, y, kind, size, alpha) {
+    ctx.globalAlpha = alpha || 1;
+    ctx.fillStyle = COLORS[kind];
+    ctx.fillRect(x + 1, y + 1, size - 2, size - 2);
+    ctx.fillStyle = 'rgba(255,255,255,0.28)';
+    ctx.fillRect(x + 1, y + 1, size - 2, 5);
+    ctx.fillStyle = 'rgba(0,0,0,0.22)';
+    ctx.fillRect(x + 1, y + size - 6, size - 2, 5);
+    ctx.globalAlpha = 1;
+  }
+
+  function preview(kind, x, y, label) {
+    ctx.fillStyle = '#9aa3bd';
+    ctx.font = '600 20px sans-serif';
+    ctx.fillText(label, x, y);
+    ctx.fillStyle = '#151c30';
+    ctx.fillRect(x, y + 10, 200, 100);
+    if (!kind) { return; }
+    var s = 28, cells = SHAPES[kind];
+    var w = kind === 'I' ? 4 : kind === 'O' ? 2 : 3, h = kind === 'I' ? 1 : 2;
+    var ox = x + 100 - (w * s) / 2 - (kind === 'O' ? s : 0), oy = y + 60 - (h * s) / 2 - (kind === 'I' ? s : 0);
+    for (var i = 0; i < cells.length; i++) { cell(ox + cells[i][0] * s, oy + cells[i][1] * s, kind, s); }
+  }
+
+  function draw() {
+    ctx.fillStyle = '#0a0f1c';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    ctx.fillStyle = flash && Date.now() - flash < 150 ? '#1e2a4a' : '#0f1528';
+    ctx.fillRect(OX, OY, W * CELL, H * CELL);
+    ctx.strokeStyle = 'rgba(255,255,255,0.04)';
+    for (var gx = 1; gx < W; gx++) { ctx.beginPath(); ctx.moveTo(OX + gx * CELL, OY); ctx.lineTo(OX + gx * CELL, OY + H * CELL); ctx.stroke(); }
+    for (var gy = 1; gy < H; gy++) { ctx.beginPath(); ctx.moveTo(OX, OY + gy * CELL); ctx.lineTo(OX + W * CELL, OY + gy * CELL); ctx.stroke(); }
+    if (board) {
+      for (var y = 0; y < H; y++) {
+        for (var x = 0; x < W; x++) {
+          if (board[y][x]) { cell(OX + x * CELL, OY + y * CELL, board[y][x], CELL); }
+        }
+      }
+    }
+    if (piece && state === 'playing') {
+      var gyDrop = 0;
+      while (!collides(piece.cells, piece.x, piece.y + gyDrop + 1)) { gyDrop++; }
+      for (var i = 0; i < piece.cells.length; i++) {
+        var px = piece.cells[i][0] + piece.x, py = piece.cells[i][1] + piece.y;
+        if (py + gyDrop >= 0) { cell(OX + px * CELL, OY + (py + gyDrop) * CELL, piece.kind, CELL, 0.22); }
+        if (py >= 0) { cell(OX + px * CELL, OY + py * CELL, piece.kind, CELL); }
+      }
+    }
+    var sx = OX + W * CELL + 40;
+    preview(next, sx, 50, 'NEXT');
+    preview(hold, sx, 200, 'HOLD');
+    ctx.fillStyle = '#9aa3bd';
+    ctx.font = '600 20px sans-serif';
+    ctx.fillText('LEVEL', sx, 370);
+    ctx.fillText('LINES', sx, 460);
+    ctx.fillStyle = '#f5f7ff';
+    ctx.font = '700 40px sans-serif';
+    ctx.fillText(String(level || 1), sx, 412);
+    ctx.fillText(String(lines || 0), sx, 502);
+  }
+
+  function frame() {
+    if (state === 'playing' && !Kit.paused()) {
+      var now = Date.now();
+      if (now >= dropAt) {
+        if (!shift(0, 1)) { lock(); }
+        dropAt = now + interval();
+      }
+    } else if (state === 'playing') {
+      dropAt = Date.now() + interval();
+    }
+    draw();
+    window.requestAnimationFrame(frame);
+  }
+
+  state = 'ready';
+  Kit.banner('Block Drop', 'Complete lines to clear them. Ten lines and the pace picks up.', '✕  Start');
+  frame();
+})();
+</script>
+</body>
+</html>

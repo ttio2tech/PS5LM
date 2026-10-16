@@ -7,6 +7,18 @@ v0.1.x are the upstream payload releases by cobanov.
 
 ## [Unreleased]
 
+### Added
+- **PS5LM Arcade**, a game store the app serves at `http://<console IP>:8083`
+  (`ps5/app/games_server.cpp`, games in `ps5/games`): a featured banner,
+  recently played, categories and a page per game, driven by the DualSense,
+  a keyboard, a mouse or touch. Eight games: Block Drop, Neon Snake, Brick
+  Breaker, 2048, Minesweeper, Memory Match, and two that use the loaded
+  model, AI Quest (an adventure it narrates) and Riddle Master. The same port
+  passes chat completions on to llama-server, so a game needs neither the
+  console's address nor CORS. Plain ES5, as the PS5 browser needs.
+  `scripts/serve-games.sh` serves them from a PC; adding a game is in
+  `docs/GAMES.md`.
+
 ## [0.8.3] - 2026-10-13
 
 ### Changed

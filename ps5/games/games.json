@@ -1,0 +1,81 @@
+{
+  "categories": ["All", "Arcade", "Puzzle", "AI"],
+  "games": [
+    {
+      "id": "ai-quest",
+      "name": "AI Quest",
+      "tagline": "An adventure the model tells as you play",
+      "category": "AI",
+      "colors": ["#7b3dff", "#ff4f9a"],
+      "featured": true,
+      "needsAi": true,
+      "description": "Pick a world and step into a story nobody has written yet. The model on your PS5 narrates every scene and offers three choices; your health, gold and items follow what happens. No two runs are the same.",
+      "controls": [["D-pad", "Pick a choice"], ["Cross", "Choose"], ["Options", "Pause"]]
+    },
+    {
+      "id": "ai-riddles",
+      "name": "Riddle Master",
+      "tagline": "Ten riddles, four answers, one clever model",
+      "category": "AI",
+      "colors": ["#00b4d8", "#7b3dff"],
+      "needsAi": true,
+      "description": "The model writes a fresh riddle and four possible answers. Pick the right one before your streak breaks. Choose easy, tricky or fiendish.",
+      "controls": [["D-pad", "Pick an answer"], ["Cross", "Answer"], ["Options", "Pause"]]
+    },
+    {
+      "id": "blocks",
+      "name": "Block Drop",
+      "tagline": "Falling blocks, clear the lines",
+      "category": "Arcade",
+      "colors": ["#ff7a18", "#ff3d6e"],
+      "featured": true,
+      "description": "The classic falling-block puzzle. Rotate and slide pieces to complete lines. Clear several at once for more points; the pace picks up every ten lines.",
+      "controls": [["Left / Right", "Move"], ["Up or Triangle", "Rotate"], ["Down", "Soft drop"], ["Cross", "Hard drop"], ["Square", "Hold"], ["Options", "Pause"]]
+    },
+    {
+      "id": "snake",
+      "name": "Neon Snake",
+      "tagline": "Eat, grow, don't bite yourself",
+      "category": "Arcade",
+      "colors": ["#00d68f", "#00a3ff"],
+      "description": "Guide the snake to the food and grow longer with every bite. Walls are fatal, and so is your own tail. It gets faster as you grow.",
+      "controls": [["D-pad", "Steer"], ["Options", "Pause"]]
+    },
+    {
+      "id": "breakout",
+      "name": "Brick Breaker",
+      "tagline": "Bounce the ball, smash the wall",
+      "category": "Arcade",
+      "colors": ["#ffb703", "#fb5607"],
+      "description": "Keep the ball in play with your paddle and break every brick. Three lives, more levels, and the ball speeds up as you go.",
+      "controls": [["Left / Right", "Move the paddle"], ["Cross", "Launch the ball"], ["Options", "Pause"]]
+    },
+    {
+      "id": "2048",
+      "name": "2048",
+      "tagline": "Slide, merge, reach 2048",
+      "category": "Puzzle",
+      "colors": ["#edc22e", "#f28e2b"],
+      "description": "Slide the tiles; two of the same number merge into one. Keep merging to reach the 2048 tile, then keep going for a high score.",
+      "controls": [["D-pad", "Slide the tiles"], ["Square", "New game"], ["Options", "Pause"]]
+    },
+    {
+      "id": "mines",
+      "name": "Minesweeper",
+      "tagline": "Clear the field, flag the mines",
+      "category": "Puzzle",
+      "colors": ["#4361ee", "#3a0ca3"],
+      "description": "Open squares without hitting a mine. Each number tells you how many mines touch that square. Flag the mines and clear the rest as fast as you can.",
+      "controls": [["D-pad", "Move"], ["Cross", "Open"], ["Square", "Flag"], ["Triangle", "New game"], ["Options", "Pause"]]
+    },
+    {
+      "id": "memory",
+      "name": "Memory Match",
+      "tagline": "Find every pair in as few turns as you can",
+      "category": "Puzzle",
+      "colors": ["#ef476f", "#ffd166"],
+      "description": "Turn over two cards at a time and find the matching pairs. Fewer turns means a better score.",
+      "controls": [["D-pad", "Move"], ["Cross", "Turn a card"], ["Square", "New game"], ["Options", "Pause"]]
+    }
+  ]
+}

@@ -58,6 +58,7 @@ For comparison, the 27B on the CPU as a payload, streamed from disk, made about 
 
 - **Chat:** llama.cpp's web UI at `http://<console IP>:8081`, with file tools and, for vision models such as Gemma 4, images (put the model's `mmproj` file beside it).
 - **API:** OpenAI Chat Completions and Responses, and Anthropic Messages, on the same port. opencode, codex, Claude Code and aider work against it: see [docs/CLI.md](docs/CLI.md).
+- **Games:** PS5LM Arcade, a game store at `http://<console IP>:8083`: Block Drop, Snake, Brick Breaker, 2048, Minesweeper, Memory Match, and two games the loaded model runs, AI Quest and Riddle Master. Played with the DualSense, a keyboard or touch: see [docs/GAMES.md](docs/GAMES.md).
 
 **Under the hood**
 
@@ -142,12 +143,13 @@ The app closes itself on request (`/data/PS5LM/quit`), so nothing is killed whil
 | Path | What |
 |---|---|
 | `ps5/app` | the native app: dashboard, planner, store, downloads, llama-server on the GPU |
+| `ps5/games` | the game store and its HTML games, served on port 8083 ([docs/GAMES.md](docs/GAMES.md)) |
 | `third_party/llama.cpp` | upstream llama.cpp, pinned as a submodule |
 | `third_party/ps5-homebrew-ui` | the UI toolkit |
 | `patches/` | PS5 changes to llama.cpp, kept small (tool confinement, Anthropic system messages, ...) |
 | `ps5/compat`, `probes/` | the payload build's libc additions and memory probes (see [docs/PAYLOAD.md](docs/PAYLOAD.md)) |
 | `scripts/` | build, release, deploy and console tools |
-| `docs/` | [coding tools](docs/CLI.md), [models that fit](docs/MODELS.md), [console notes](docs/CONSOLE.md), [porting](docs/PORTING.md), [research](docs/RESEARCH.md), [plans](docs/plans) |
+| `docs/` | [coding tools](docs/CLI.md), [games](docs/GAMES.md), [models that fit](docs/MODELS.md), [console notes](docs/CONSOLE.md), [porting](docs/PORTING.md), [research](docs/RESEARCH.md), [plans](docs/plans) |
 
 ## Versions and branches
 

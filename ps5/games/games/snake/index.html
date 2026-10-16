@@ -1,0 +1,158 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+<title>Neon Snake</title>
+<!-- SPDX-License-Identifier: GPL-3.0-or-later -->
+<link rel="stylesheet" href="../../lib/kit.css">
+</head>
+<body>
+<div class="kit-stage"><canvas id="c" width="960" height="640"></canvas></div>
+<script src="../../lib/kit.js"></script>
+<script>
+(function () {
+  'use strict';
+  var COLS = 24, ROWS = 16, CELL = 40;
+  var canvas = document.getElementById('c');
+  var ctx = canvas.getContext('2d');
+  var snake, dir, queue, food, score, state, last, step, eaten;
+
+  Kit.init({
+    id: 'snake', name: 'Neon Snake',
+    controls: [['D-pad', 'Steer'], ['Cross', 'Start'], ['Options', 'Pause']],
+    touch: [['a', '✕']]
+  });
+  Kit.fit(canvas, COLS / ROWS);
+
+  function reset() {
+    snake = [{ x: 8, y: 8 }, { x: 7, y: 8 }, { x: 6, y: 8 }];
+    dir = { x: 1, y: 0 };
+    queue = [];
+    score = 0;
+    eaten = 0;
+    step = 140;
+    Kit.setScore(0);
+    placeFood();
+  }
+
+  function placeFood() {
+    for (;;) {
+      var f = { x: Math.floor(Math.random() * COLS), y: Math.floor(Math.random() * ROWS) };
+      var hit = false;
+      for (var i = 0; i < snake.length; i++) {
+        if (snake[i].x === f.x && snake[i].y === f.y) { hit = true; break; }
+      }
+      if (!hit) { food = f; return; }
+    }
+  }
+
+  var DIRS = { up: { x: 0, y: -1 }, down: { x: 0, y: 1 }, left: { x: -1, y: 0 }, right: { x: 1, y: 0 } };
+
+  Kit.on(function (action, repeat) {
+    if (state !== 'playing') {
+      if (action === 'a') { begin(); }
+      return;
+    }
+    var d = DIRS[action];
+    if (!d || repeat) { return; }
+    // Turns queue up, so two quick presses between steps both count.
+    var lastDir = queue.length ? queue[queue.length - 1] : dir;
+    if (d.x === -lastDir.x && d.y === -lastDir.y) { return; }
+    if (d.x === lastDir.x && d.y === lastDir.y) { return; }
+    if (queue.length < 3) { queue.push(d); }
+  });
+
+  function begin() {
+    reset();
+    state = 'playing';
+    Kit.banner(null);
+    last = Date.now();
+  }
+
+  function over() {
+    state = 'over';
+    var best = Kit.submit(score);
+    Kit.banner('Game over', 'Score ' + score + (best ? ' · new best!' : ''), '✕  Play again');
+  }
+
+  function tick() {
+    if (queue.length) { dir = queue.shift(); }
+    var head = { x: snake[0].x + dir.x, y: snake[0].y + dir.y };
+    if (head.x < 0 || head.y < 0 || head.x >= COLS || head.y >= ROWS) { over(); return; }
+    for (var i = 0; i < snake.length - 1; i++) {
+      if (snake[i].x === head.x && snake[i].y === head.y) { over(); return; }
+    }
+    snake.unshift(head);
+    if (head.x === food.x && head.y === food.y) {
+      eaten++;
+      score += 10 + Math.floor(eaten / 5) * 5;
+      Kit.setScore(score);
+      step = Math.max(65, 140 - eaten * 3);
+      placeFood();
+    } else {
+      snake.pop();
+    }
+  }
+
+  function draw() {
+    ctx.fillStyle = '#0a0f1c';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    ctx.fillStyle = 'rgba(255,255,255,0.035)';
+    for (var x = 0; x < COLS; x++) {
+      for (var y = 0; y < ROWS; y++) {
+        if ((x + y) % 2) { ctx.fillRect(x * CELL, y * CELL, CELL, CELL); }
+      }
+    }
+    var t = Date.now() / 300;
+    ctx.shadowBlur = 24;
+    ctx.shadowColor = '#ff4f9a';
+    ctx.fillStyle = '#ff4f9a';
+    var r = CELL * (0.32 + Math.sin(t) * 0.04);
+    ctx.beginPath();
+    ctx.arc(food.x * CELL + CELL / 2, food.y * CELL + CELL / 2, r, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.shadowColor = '#00d68f';
+    for (var i = snake.length - 1; i >= 0; i--) {
+      var k = i / snake.length;
+      ctx.fillStyle = i === 0 ? '#eafff6' : 'rgb(' + Math.floor(0 + 0 * k) + ',' + Math.floor(214 - 80 * k) + ',' + Math.floor(143 + 100 * k) + ')';
+      var s = snake[i];
+      roundRect(s.x * CELL + 3, s.y * CELL + 3, CELL - 6, CELL - 6, 9);
+    }
+    ctx.shadowBlur = 0;
+  }
+
+  function roundRect(x, y, w, h, r) {
+    ctx.beginPath();
+    ctx.moveTo(x + r, y);
+    ctx.arcTo(x + w, y, x + w, y + h, r);
+    ctx.arcTo(x + w, y + h, x, y + h, r);
+    ctx.arcTo(x, y + h, x, y, r);
+    ctx.arcTo(x, y, x + w, y, r);
+    ctx.fill();
+  }
+
+  function frame() {
+    if (state === 'playing' && !Kit.paused()) {
+      var now = Date.now();
+      // Catch up a step at a time, at most a few, after a slow frame.
+      for (var n = 0; now - last >= step && n < 3 && state === 'playing'; n++) {
+        last += step;
+        tick();
+      }
+      if (now - last > step * 3) { last = now; }
+    } else {
+      last = Date.now();
+    }
+    draw();
+    window.requestAnimationFrame(frame);
+  }
+
+  reset();
+  state = 'ready';
+  Kit.banner('Neon Snake', 'Eat the glow, grow longer, avoid the walls and your tail', '✕  Start');
+  frame();
+})();
+</script>
+</body>
+</html>

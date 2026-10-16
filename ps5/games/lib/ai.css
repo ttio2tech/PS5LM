@@ -1,0 +1,28 @@
+/* What the AI games share: a reading column, choices, the model at work.
+   SPDX-License-Identifier: GPL-3.0-or-later */
+.ai-page { flex: 1; overflow-y: auto; display: flex; justify-content: center; padding: 1.5rem 16px 2rem; }
+.ai-col { width: 100%; max-width: 46rem; }
+.ai-col h1 { font-size: 2rem; margin: 0.5rem 0 0.3rem; }
+.ai-col .lead { color: var(--muted); margin: 0 0 1.5rem; }
+.ai-status { display: flex; gap: 1.2rem; flex-wrap: wrap; font-size: 0.9rem; color: var(--muted); margin-bottom: 1rem; }
+.ai-status b { color: var(--text); }
+.ai-text { font-size: 1.15rem; line-height: 1.6; white-space: pre-wrap; margin: 0 0 1.4rem; }
+.ai-event { display: inline-block; margin: 0 0.5rem 0.6rem 0; padding: 0.2rem 0.7rem; border-radius: 999px; font-size: 0.8rem; background: var(--raised); }
+.ai-event.good { color: var(--good); }
+.ai-event.bad { color: var(--bad); }
+.choices { list-style: none; padding: 0; margin: 0; }
+.choice { display: block; width: 100%; text-align: left; margin-bottom: 0.7rem; padding: 0.9rem 1.2rem;
+  border-radius: 0.8rem; background: var(--raised); border: 1px solid var(--line); font-size: 1.05rem; line-height: 1.4; }
+.choice .k { display: inline-block; width: 1.6rem; color: var(--muted); font-weight: 700; }
+.choice:focus { outline: none; background: var(--text); color: #000; border-color: var(--text); }
+.choice:focus .k { color: #000; }
+.choice.right { background: #134d36; border-color: var(--good); }
+.choice.wrong { background: #4d1820; border-color: var(--bad); }
+.thinking { display: flex; align-items: center; gap: 0.8rem; color: var(--muted); padding: 1.2rem 0; }
+.thinking i { width: 0.6rem; height: 0.6rem; border-radius: 50%; background: var(--accent);
+  -webkit-animation: blink 1s infinite; animation: blink 1s infinite; }
+.thinking i:nth-child(2) { -webkit-animation-delay: 0.2s; animation-delay: 0.2s; }
+.thinking i:nth-child(3) { -webkit-animation-delay: 0.4s; animation-delay: 0.4s; }
+@-webkit-keyframes blink { 0%, 100% { opacity: 0.2; } 50% { opacity: 1; } }
+@keyframes blink { 0%, 100% { opacity: 0.2; } 50% { opacity: 1; } }
+.ai-error { color: #ffcf70; margin: 1rem 0; }
